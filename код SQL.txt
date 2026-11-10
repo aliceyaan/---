@@ -1,0 +1,724 @@
+--ЧАСТЬ 1. СОЗДАНИЕ БД
+--1. Создание базы данных
+DROP DATABASE IF EXISTS task_management;
+CREATE DATABASE task_management
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE task_management;
+
+--2. Создание таблиц и связей
+CREATE TABLE `positions`(
+    `kod_dolzhnosti` INT NOT NULL,
+    `nazvanie_dolzhnosti` TEXT NOT NULL,
+    PRIMARY KEY(`kod_dolzhnosti`)
+);
+
+CREATE TABLE `departments`(
+    `kod_podrazdeleniya` INT NOT NULL,
+    `nazvanie_podrazdeleniya` TEXT NOT NULL,
+    `kod_rukovoditelya` INT NULL,
+    PRIMARY KEY(`kod_podrazdeleniya`)
+); 
+
+CREATE TABLE `employees`(
+    `kod_sotrudnika` INT NOT NULL,
+    `fio` TEXT NOT NULL,
+    `kod_dolzhnosti` INT NOT NULL,
+    `kod_podrazdeleniya` INT NOT NULL,
+    `email` TEXT NOT NULL,
+    `telefon` TEXT NOT NULL,
+    PRIMARY KEY(`kod_sotrudnika`)
+);
+ALTER TABLE `employees` ADD UNIQUE `employees_email_unique`(`email`);
+
+CREATE TABLE `request_types`(
+    `kod_tipa_zayavki` INT NOT NULL,
+    `nazvanie_tipa_zayavki` TEXT NOT NULL,
+    PRIMARY KEY(`kod_tipa_zayavki`)
+);
+
+CREATE TABLE `priorities`(
+    `kod_prioriteta` INT NOT NULL,
+    `nazvanie_prioriteta` TEXT NOT NULL,
+    PRIMARY KEY(`kod_prioriteta`)
+);
+
+CREATE TABLE `statuses`(
+    `kod_statusa` INT NOT NULL,
+    `nazvanie_statusa` TEXT NOT NULL,
+    PRIMARY KEY(`kod_statusa`)
+);
+
+CREATE TABLE `requests`(
+    `kod_zayavki` INT NOT NULL,
+    `tema_zayavki` TEXT NOT NULL,
+    `opisanie_zayavki` TEXT NOT NULL,
+    `kod_tipa_zayavki` INT NOT NULL,
+    `kod_prioriteta` INT NOT NULL,
+    `kod_statusa` INT NOT NULL,
+    `data_sozdaniya` DATE NOT NULL DEFAULT (CURRENT_DATE),
+    `planovyy_srok` DATE NOT NULL,
+    `fakticheskiy_srok` DATE NULL,
+    `kod_initsiatora` INT NOT NULL,
+    PRIMARY KEY(`kod_zayavki`)
+);
+
+CREATE TABLE `tasks`(
+    `kod_zadachi` INT NOT NULL,
+    `naimenovanie_zadachi` TEXT NOT NULL,
+    `kod_ispolnitelya` INT NOT NULL,
+    `kod_postanovshchika` INT NOT NULL,
+    `kod_statusa` INT NOT NULL,
+    `data_sozdaniya` DATE NOT NULL DEFAULT (CURRENT_DATE),
+    `planovyy_srok` DATE NOT NULL,
+    `fakticheskiy_srok` DATE NULL,
+    `kod_svyazannoy_zayavki` INT NULL,
+    PRIMARY KEY(`kod_zadachi`)
+);
+
+CREATE TABLE `approvals`(
+    `kod_soglasovaniya` INT NOT NULL,
+    `kod_zayavki` INT NOT NULL,
+    `kod_soglasuyushchego` INT NOT NULL,
+    `rezultat_soglasovaniya` TEXT NOT NULL,
+    `kommentariy` TEXT NULL,
+    `data_resheniya` DATE NOT NULL,
+    PRIMARY KEY(`kod_soglasovaniya`)
+);
+--Внешние ключи
+ALTER TABLE `tasks`
+    ADD CONSTRAINT `tasks_kod_statusa_foreign` 
+    FOREIGN KEY(`kod_statusa`) REFERENCES `statuses`(`kod_statusa`);
+
+ALTER TABLE `requests`
+    ADD CONSTRAINT `requests_kod_tipa_zayavki_foreign`
+    FOREIGN KEY(`kod_tipa_zayavki`) REFERENCES `request_types`(`kod_tipa_zayavki`);
+
+ALTER TABLE `approvals`
+    ADD CONSTRAINT `approvals_kod_zayavki_foreign`
+    FOREIGN KEY(`kod_zayavki`) REFERENCES `requests`(`kod_zayavki`);
+
+ALTER TABLE `requests`
+    ADD CONSTRAINT `requests_kod_prioriteta_foreign`
+    FOREIGN KEY(`kod_prioriteta`) REFERENCES `priorities`(`kod_prioriteta`);
+
+ALTER TABLE `departments`
+    ADD CONSTRAINT `departments_kod_rukovoditelya_foreign`
+    FOREIGN KEY(`kod_rukovoditelya`) REFERENCES `employees`(`kod_sotrudnika`);
+
+ALTER TABLE `tasks`
+    ADD CONSTRAINT `tasks_kod_svyazannoy_zayavki_foreign`
+    FOREIGN KEY(`kod_svyazannoy_zayavki`) REFERENCES `requests`(`kod_zayavki`);
+
+ALTER TABLE `tasks`
+    ADD CONSTRAINT `tasks_kod_ispolnitelya_foreign`
+    FOREIGN KEY(`kod_ispolnitelya`) REFERENCES `employees`(`kod_sotrudnika`);
+
+ALTER TABLE `employees`
+    ADD CONSTRAINT `employees_kod_podrazdeleniya_foreign`
+    FOREIGN KEY(`kod_podrazdeleniya`) REFERENCES `departments`(`kod_podrazdeleniya`);
+
+ALTER TABLE `approvals`
+    ADD CONSTRAINT `approvals_kod_soglasuyushchego_foreign`
+    FOREIGN KEY(`kod_soglasuyushchego`) REFERENCES `employees`(`kod_sotrudnika`);
+
+ALTER TABLE `employees`
+    ADD CONSTRAINT `employees_kod_dolzhnosti_foreign`
+    FOREIGN KEY(`kod_dolzhnosti`) REFERENCES `positions`(`kod_dolzhnosti`);
+
+ALTER TABLE `requests`
+    ADD CONSTRAINT `requests_kod_initsiatora_foreign`
+    FOREIGN KEY(`kod_initsiatora`) REFERENCES `employees`(`kod_sotrudnika`);
+
+ALTER TABLE `requests`
+    ADD CONSTRAINT `requests_kod_statusa_foreign`
+    FOREIGN KEY(`kod_statusa`) REFERENCES `statuses`(`kod_statusa`);
+
+ALTER TABLE `tasks`
+    ADD CONSTRAINT `tasks_kod_postanovshchika_foreign`
+    FOREIGN KEY(`kod_postanovshchika`) REFERENCES `employees`(`kod_sotrudnika`);
+
+--3. Изменение структуры таблиц
+ALTER TABLE `approvals`
+    ADD CONSTRAINT `uq_apr_request_employee`
+    UNIQUE (`kod_zayavki`, `kod_soglasuyushchego`);
+
+ALTER TABLE `employees`
+    ADD COLUMN `data_priema` DATE NULL COMMENT 'Дата приёма на работу';
+
+ALTER TABLE `employees`
+    ADD COLUMN `status_sotrudnika` VARCHAR NOT NULL DEFAULT 'активен'
+    COMMENT 'активен / в отпуске / уволен';
+
+ALTER TABLE `tasks`
+    ADD COLUMN `opisanie_zadachi` TEXT NULL COMMENT 'Подробное описание задачи';
+
+ALTER TABLE `employees`
+    ADD CONSTRAINT `chk_emp_status`
+    CHECK (`status_sotrudnika` IN ('активен', 'в отпуске', 'уволен'));
+
+CREATE INDEX `idx_emp_email` ON `employees` (`email`);
+
+CREATE INDEX `idx_emp_dolzhnost`   ON `employees` (`kod_dolzhnosti`);
+CREATE INDEX `idx_emp_podrazdel`   ON `employees` (`kod_podrazdeleniya`);
+CREATE INDEX `idx_req_status`      ON `requests`  (`kod_statusa`);
+CREATE INDEX `idx_task_status`     ON `tasks`     (`kod_statusa`);
+CREATE INDEX `idx_apr_zayavka`     ON `approvals` (`kod_zayavki`);
+
+--4. Вставка записей
+INSERT INTO `positions` (`kod_dolzhnosti`, `nazvanie_dolzhnosti`) VALUES
+(1, 'Генеральный директор'),
+(2, 'Начальник отдела'),
+(3, 'Ведущий специалист'),
+(4, 'Специалист'),
+(5, 'Юрист'),
+(6, 'Бухгалтер'),
+(7, 'Системный администратор'),
+(8, 'Аналитик');
+
+INSERT INTO `departments` (`kod_podrazdeleniya`, `nazvanie_podrazdeleniya`, `kod_rukovoditelya`) VALUES
+(1, 'Администрация',     NULL),
+(2, 'Отдел кадров',      NULL),
+(3, 'Бухгалтерия',       NULL),
+(4, 'Юридический отдел', NULL),
+(5, 'IT-отдел',          NULL),
+(6, 'Отдел закупок',     NULL);
+
+INSERT INTO `employees` (`kod_sotrudnika`, `fio`, `kod_dolzhnosti`, `kod_podrazdeleniya`, `email`, `telefon`, `data_priema`, `status_sotrudnika`) VALUES
+(10001, 'Иванов Иван Иванович',       1, 1, 'ivanov@firma.ru',   '8 (909) 111-0001', '2015-03-01', 'активен'),
+(10002, 'Петрова Анна Сергеевна',     2, 2, 'petrova@firma.ru',  '8 (909) 111-0002', '2018-06-15', 'активен'),
+(10003, 'Сидоров Пётр Алексеевич',    2, 5, 'sidorov@firma.ru',  '8 (909) 111-0003', '2017-01-20', 'активен'),
+(10004, 'Козлова Мария Викторовна',   5, 4, 'kozlova@firma.ru',  '8 (909) 111-0004', '2019-09-01', 'активен'),
+(10005, 'Смирнов Алексей Дмитриевич', 6, 3, 'smirnov@firma.ru',  '8 (909) 111-0005', '2016-11-10', 'активен'),
+(10006, 'Васильева Елена Игоревна',   3, 6, 'vasileva@firma.ru', '8 (909) 111-0006', '2020-02-14', 'активен'),
+(10007, 'Николаев Дмитрий Олегович',  7, 5, 'nikolaev@firma.ru', '8 (909) 111-0007', '2021-04-05', 'активен'),
+(10008, 'Орлова Ольга Павловна',      8, 1, 'orlova@firma.ru',   '8 (909) 111-0008', '2019-08-22', 'активен'),
+(10009, 'Фёдоров Сергей Николаевич',  4, 6, 'fedorov@firma.ru',  '8 (909) 111-0009', '2022-01-17', 'активен'),
+(10010, 'Морозова Татьяна Юрьевна',   4, 2, 'morozova@firma.ru', '8 (909) 111-0010', '2020-05-30', 'в отпуске');
+
+UPDATE `departments` SET `kod_rukovoditelya` = 10001 WHERE `kod_podrazdeleniya` = 1;
+UPDATE `departments` SET `kod_rukovoditelya` = 10002 WHERE `kod_podrazdeleniya` = 2;
+UPDATE `departments` SET `kod_rukovoditelya` = 10005 WHERE `kod_podrazdeleniya` = 3;
+UPDATE `departments` SET `kod_rukovoditelya` = 10004 WHERE `kod_podrazdeleniya` = 4;
+UPDATE `departments` SET `kod_rukovoditelya` = 10003 WHERE `kod_podrazdeleniya` = 5;
+UPDATE `departments` SET `kod_rukovoditelya` = 10006 WHERE `kod_podrazdeleniya` = 6;
+
+INSERT INTO `request_types` (`kod_tipa_zayavki`, `nazvanie_tipa_zayavki`) VALUES
+(1, 'Закупка'),
+(2, 'Доступ к ресурсам'),
+(3, 'Отпуск'),
+(4, 'Командировка'),
+(5, 'Ремонт'),
+(6, 'Согласование документа');
+
+INSERT INTO `priorities` (`kod_prioriteta`, `nazvanie_prioriteta`) VALUES
+(1, 'Низкий'),
+(2, 'Средний'),
+(3, 'Высокий'),
+(4, 'Критический');
+
+INSERT INTO `statuses` (`kod_statusa`, `nazvanie_statusa`) VALUES
+(1, 'Новая'),
+(2, 'В работе'),
+(3, 'На согласовании'),
+(4, 'Согласована'),
+(5, 'Отклонена'),
+(6, 'Выполнена'),
+(7, 'На проверке');
+
+INSERT INTO `requests` (`kod_zayavki`, `tema_zayavki`, `opisanie_zayavki`, `kod_tipa_zayavki`, `kod_prioriteta`, `kod_statusa`, `data_sozdaniya`, `planovyy_srok`, `fakticheskiy_srok`, `kod_initsiatora`) VALUES
+(1, 'Закупка ноутбуков',        'Необходимо закупить 5 ноутбуков для IT-отдела',      1, 3, 3, '2026-09-01', '2026-09-30', NULL,         10007),
+(2, 'Доступ к ERP-системе',     'Открыть доступ новому сотруднику к ERP',              2, 2, 4, '2026-09-05', '2026-09-10', '2026-09-09', 10009),
+(3, 'Отпуск Фёдорова',          'Ежегодный оплачиваемый отпуск на 14 дней',            3, 1, 4, '2026-09-10', '2026-09-20', '2026-09-18', 10009),
+(4, 'Командировка в филиал',    'Командировка в Санкт-Петербург на 3 дня',             4, 2, 2, '2026-09-15', '2026-10-01', NULL,         10006),
+(5, 'Ремонт принтера',          'Не работает принтер в бухгалтерии',                   5, 3, 1, '2026-10-01', '2026-10-05', NULL,         10005),
+(6, 'Согласование договора',    'Договор поставки канцтоваров на 2026 год',            6, 3, 3, '2026-10-02', '2026-10-15', NULL,         10006);
+
+INSERT INTO `tasks` (`kod_zadachi`, `naimenovanie_zadachi`, `opisanie_zadachi`, `kod_ispolnitelya`, `kod_postanovshchika`, `kod_statusa`, `data_sozdaniya`, `planovyy_srok`, `fakticheskiy_srok`, `kod_svyazannoy_zayavki`) VALUES
+(1, 'Подготовить спецификацию',          'Составить спецификацию на ноутбуки',              10007, 10003, 6, '2026-09-02', '2026-09-10', '2026-09-09', 1),
+(2, 'Запросить коммерческие предложения','Собрать КП от 3 поставщиков',                     10009, 10006, 2, '2026-09-11', '2026-09-25', NULL,         1),
+(3, 'Настроить учётную запись ERP',      'Создать УЗ и выдать права',                       10007, 10003, 6, '2026-09-06', '2026-09-09', '2026-09-08', 2),
+(4, 'Оформить приказ на отпуск',         'Подготовить приказ Т-6',                          10010, 10002, 6, '2026-09-11', '2026-09-15', '2026-09-14', 3),
+(5, 'Забронировать билеты',              'Ж/д билеты Москва — СПб',                         10006, 10001, 2, '2026-09-16', '2026-09-28', NULL,         4),
+(6, 'Диагностика принтера',              'Проверить и при необходимости заменить картридж', 10007, 10005, 1, '2026-10-01', '2026-10-04', NULL,         5);
+
+INSERT INTO `approvals` (`kod_soglasovaniya`, `kod_zayavki`, `kod_soglasuyushchego`, `rezultat_soglasovaniya`, `kommentariy`, `data_resheniya`) VALUES
+(1, 1, 10003, 'Согласовано', 'Бюджет утверждён',                '2026-09-03'),
+(2, 1, 10005, 'Согласовано', 'Средства зарезервированы',        '2026-09-04'),
+(3, 2, 10003, 'Согласовано', NULL,                              '2026-09-07'),
+(4, 3, 10002, 'Согласовано', 'График отпусков позволяет',       '2026-09-12'),
+(5, 6, 10004, 'Согласовано', 'Юридическая экспертиза пройдена', '2026-10-03'),
+(6, 6, 10005, 'Согласовано', 'Сумма в пределах лимита',          '2026-10-04'),
+(7, 4, 10001, 'Согласовано', 'Командировка целесообразна',      '2026-09-17');
+
+--5. Обновление записей
+UPDATE `requests`
+SET `kod_statusa` = 4
+WHERE `kod_zayavki` = 1;
+
+UPDATE `tasks`
+SET `kod_statusa` = 6,
+    `fakticheskiy_srok` = '2026-09-24'
+WHERE `kod_zadachi` = 2;
+
+UPDATE `employees`
+SET `telefon` = '(495) 222-0007'
+WHERE `kod_sotrudnika` = 10007;
+
+UPDATE `employees`
+SET `kod_podrazdeleniya` = 5
+WHERE `kod_sotrudnika` = 10009;
+
+UPDATE `requests`
+SET `kod_statusa` = 2
+WHERE `kod_statusa` = 1
+  AND `data_sozdaniya` < DATE_SUB(CURRENT_DATE, INTERVAL 7 DAY);
+
+--6. Удаление записей
+DELETE FROM `approvals`
+WHERE `kod_soglasovaniya` = 999999;
+
+DELETE FROM `requests`
+WHERE `kod_zayavki` = 999999;
+
+--7. Создание пользователей и наделение их правами
+CREATE USER IF NOT EXISTS 'admin_tm'@'localhost' IDENTIFIED BY 'Admin_TM_2026!';
+GRANT ALL PRIVILEGES ON task_management.* TO 'admin_tm'@'localhost';
+
+CREATE USER IF NOT EXISTS 'employee_tm'@'localhost' IDENTIFIED BY 'Emp_TM_2026!';
+GRANT SELECT ON task_management.positions     TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.departments   TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.employees     TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.request_types TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.priorities    TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.statuses      TO 'employee_tm'@'localhost';
+GRANT SELECT, INSERT ON task_management.requests TO 'employee_tm'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON task_management.tasks TO 'employee_tm'@'localhost';
+GRANT SELECT ON task_management.approvals TO 'employee_tm'@'localhost';
+
+CREATE USER IF NOT EXISTS 'manager_tm'@'localhost' IDENTIFIED BY 'Mgr_TM_2026!';
+GRANT SELECT ON task_management.* TO 'manager_tm'@'localhost';
+GRANT INSERT, UPDATE ON task_management.requests  TO 'manager_tm'@'localhost';
+GRANT INSERT, UPDATE ON task_management.tasks     TO 'manager_tm'@'localhost';
+GRANT INSERT, UPDATE ON task_management.approvals TO 'manager_tm'@'localhost';
+
+CREATE USER IF NOT EXISTS 'approver_tm'@'localhost' IDENTIFIED BY 'Apr_TM_2026!';
+GRANT SELECT ON task_management.positions     TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.departments   TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.employees     TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.request_types TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.priorities    TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.statuses      TO 'approver_tm'@'localhost';
+GRANT SELECT ON task_management.requests      TO 'approver_tm'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON task_management.approvals TO 'approver_tm'@'localhost';
+
+CREATE USER IF NOT EXISTS 'analyst_tm'@'localhost' IDENTIFIED BY 'Anl_TM_2026!';
+GRANT SELECT ON task_management.* TO 'analyst_tm'@'localhost';
+
+CREATE USER IF NOT EXISTS 'director_tm'@'localhost' IDENTIFIED BY 'Dir_TM_2026!';
+GRANT SELECT ON task_management.* TO 'director_tm'@'localhost';
+
+--8. Выгрузка метаданных
+DESCRIBE `positions`;
+DESCRIBE `departments`;
+DESCRIBE `employees`;
+DESCRIBE `request_types`;
+DESCRIBE `priorities`;
+DESCRIBE `statuses`;
+DESCRIBE `requests`;
+DESCRIBE `tasks`;
+DESCRIBE `approvals`;
+
+SHOW TABLES;
+
+--ЧАСТЬ 2. ЗАПРОСЫ
+--1.1. неявное соединение таблиц с фильтром данных (WHERE) и сортировкой (ORDER BY)
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    e.fio AS initsiator,
+    rt.nazvanie_tipa_zayavki AS tip,
+    p.nazvanie_prioriteta AS prioritet,
+    s.nazvanie_statusa AS status,
+    r.data_sozdaniya,
+    r.planovyy_srok
+FROM requests r, employees e, request_types rt, priorities p, statuses s
+WHERE r.kod_initsiatora = e.kod_sotrudnika
+  AND r.kod_tipa_zayavki = rt.kod_tipa_zayavki
+  AND r.kod_prioriteta = p.kod_prioriteta
+  AND r.kod_statusa = s.kod_statusa
+  AND p.kod_prioriteta IN (3, 4)
+ORDER BY r.data_sozdaniya DESC;
+
+SELECT
+    e.kod_sotrudnika,
+    e.fio,
+    pos.nazvanie_dolzhnosti,
+    d.nazvanie_podrazdeleniya,
+    e.email,
+    e.telefon
+FROM employees e, positions pos, departments d
+WHERE e.kod_dolzhnosti = pos.kod_dolzhnosti
+  AND e.kod_podrazdeleniya = d.kod_podrazdeleniya
+  AND e.status_sotrudnika = 'активен'
+ORDER BY d.nazvanie_podrazdeleniya, e.fio;
+
+--1.2. явное соединение таблиц (JOIN)
+SELECT
+    t.kod_zadachi,
+    t.naimenovanie_zadachi,
+    isp.fio AS ispolnitel,
+    post.fio AS postanovshchik,
+    s.nazvanie_statusa AS status,
+    r.tema_zayavki AS svyazannaya_zayavka,
+    t.data_sozdaniya,
+    t.planovyy_srok,
+    t.fakticheskiy_srok
+FROM tasks t
+INNER JOIN employees isp  ON t.kod_ispolnitelya = isp.kod_sotrudnika
+INNER JOIN employees post ON t.kod_postanovshchika = post.kod_sotrudnika
+INNER JOIN statuses s     ON t.kod_statusa = s.kod_statusa
+LEFT JOIN requests r      ON t.kod_svyazannoy_zayavki = r.kod_zayavki
+ORDER BY t.data_sozdaniya;
+
+SELECT
+    a.kod_soglasovaniya,
+    r.tema_zayavki,
+    e.fio AS soglasuyushchiy,
+    d.nazvanie_podrazdeleniya AS otdel_soglasuyushchego,
+    a.rezultat_soglasovaniya,
+    a.kommentariy,
+    a.data_resheniya
+FROM approvals a
+INNER JOIN requests r  ON a.kod_zayavki = r.kod_zayavki
+INNER JOIN employees e ON a.kod_soglasuyushchego = e.kod_sotrudnika
+INNER JOIN departments d ON e.kod_podrazdeleniya = d.kod_podrazdeleniya
+ORDER BY a.data_resheniya;
+
+SELECT
+    d.kod_podrazdeleniya,
+    d.nazvanie_podrazdeleniya,
+    e.fio AS rukovoditel,
+    e.email,
+    e.telefon
+FROM departments d
+LEFT JOIN employees e ON d.kod_rukovoditelya = e.kod_sotrudnika
+ORDER BY d.nazvanie_podrazdeleniya;
+
+--2.3. агрегирующие операции (SUM, AVG, COUNT, MAX, MIN)
+SELECT
+    (SELECT COUNT(*) FROM requests)  AS vsego_zayavok,
+    (SELECT COUNT(*) FROM tasks)     AS vsego_zadach,
+    (SELECT COUNT(*) FROM approvals) AS vsego_soglasovaniy,
+    (SELECT COUNT(*) FROM employees WHERE status_sotrudnika = 'активен') AS aktivnyh_sotrudnikov;
+
+SELECT
+    MIN(data_sozdaniya) AS samaya_rannyaya,
+    MAX(data_sozdaniya) AS samaya_pozdnyaya,
+    COUNT(*) AS kolichestvo
+FROM requests;
+
+SELECT
+    COUNT(*) AS zakrytyh_zadach,
+    ROUND(AVG(DATEDIFF(fakticheskiy_srok, data_sozdaniya)), 1) AS avg_dney,
+    MIN(DATEDIFF(fakticheskiy_srok, data_sozdaniya)) AS min_dney,
+    MAX(DATEDIFF(fakticheskiy_srok, data_sozdaniya)) AS max_dney
+FROM tasks
+WHERE fakticheskiy_srok IS NOT NULL;
+
+--2.4. группировка GROUP BY и фильтрация HAVING
+SELECT
+    s.nazvanie_statusa,
+    COUNT(r.kod_zayavki) AS kolichestvo
+FROM statuses s
+LEFT JOIN requests r ON s.kod_statusa = r.kod_statusa
+GROUP BY s.kod_statusa, s.nazvanie_statusa
+ORDER BY kolichestvo DESC;
+
+SELECT
+    rt.nazvanie_tipa_zayavki,
+    COUNT(r.kod_zayavki) AS kolichestvo
+FROM request_types rt
+INNER JOIN requests r ON rt.kod_tipa_zayavki = r.kod_tipa_zayavki
+GROUP BY rt.kod_tipa_zayavki, rt.nazvanie_tipa_zayavki
+HAVING COUNT(r.kod_zayavki) >= 1
+ORDER BY kolichestvo DESC;
+
+SELECT
+    d.nazvanie_podrazdeleniya,
+    COUNT(e.kod_sotrudnika) AS kolichestvo_sotrudnikov
+FROM departments d
+INNER JOIN employees e ON d.kod_podrazdeleniya = e.kod_podrazdeleniya
+GROUP BY d.kod_podrazdeleniya, d.nazvanie_podrazdeleniya
+HAVING COUNT(e.kod_sotrudnika) >= 2
+ORDER BY kolichestvo_sotrudnikov DESC;
+
+SELECT
+    e.fio AS ispolnitel,
+    COUNT(t.kod_zadachi) AS kolichestvo_zadach,
+    SUM(CASE WHEN t.kod_statusa = 6 THEN 1 ELSE 0 END) AS vypolneno,
+    SUM(CASE WHEN t.kod_statusa <> 6 THEN 1 ELSE 0 END) AS v_rabote
+FROM employees e
+INNER JOIN tasks t ON e.kod_sotrudnika = t.kod_ispolnitelya
+GROUP BY e.kod_sotrudnika, e.fio
+HAVING COUNT(t.kod_zadachi) > 1
+ORDER BY kolichestvo_zadach DESC;
+
+--2.5. вложенные подзапросы (запрос в запросе)
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    r.data_sozdaniya
+FROM requests r
+WHERE r.kod_zayavki IN (
+    SELECT a.kod_zayavki
+    FROM approvals a
+)
+ORDER BY r.data_sozdaniya;
+
+SELECT
+    e.kod_sotrudnika,
+    e.fio,
+    e.email
+FROM employees e
+WHERE e.kod_sotrudnika NOT IN (
+    SELECT r.kod_initsiatora
+    FROM requests r
+)
+ORDER BY e.fio;
+
+SELECT
+    e.kod_sotrudnika,
+    e.fio
+FROM employees e
+WHERE EXISTS (
+    SELECT 1
+    FROM tasks t
+    WHERE t.kod_ispolnitelya = e.kod_sotrudnika
+      AND t.kod_statusa = 2
+);
+
+--2.6. использование «функций управления потоком» (IF, CASE)
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    r.planovyy_srok,
+    r.fakticheskiy_srok,
+    CASE
+        WHEN r.fakticheskiy_srok IS NULL AND r.planovyy_srok < CURRENT_DATE
+            THEN 'ПРОСРОЧЕНА'
+        WHEN r.fakticheskiy_srok IS NULL
+            THEN 'В сроке (ещё открыта)'
+        WHEN r.fakticheskiy_srok <= r.planovyy_srok
+            THEN 'Закрыта вовремя'
+        ELSE 'Закрыта с опозданием'
+    END AS ocenka_sroka,
+    IF(r.fakticheskiy_srok IS NULL, 'Открыта', 'Закрыта') AS sostoyanie
+FROM requests r
+ORDER BY r.kod_zayavki;
+
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    p.nazvanie_prioriteta,
+    CASE p.kod_prioriteta
+        WHEN 1 THEN 'Можно отложить'
+        WHEN 2 THEN 'Плановая обработка'
+        WHEN 3 THEN 'Срочно взять в работу'
+        WHEN 4 THEN 'Немедленная реакция'
+        ELSE 'Неизвестно'
+    END AS rekomendaciya,
+    IF(p.kod_prioriteta >= 3, 'ДА', 'НЕТ') AS trebuet_vnimaniya_rukovoditelya
+FROM requests r
+INNER JOIN priorities p ON r.kod_prioriteta = p.kod_prioriteta
+ORDER BY p.kod_prioriteta DESC;
+
+SELECT
+    e.fio,
+    e.status_sotrudnika,
+    CASE e.status_sotrudnika
+        WHEN 'активен'   THEN 'Полный доступ'
+        WHEN 'в отпуске' THEN 'Только уведомления'
+        WHEN 'уволен'    THEN 'Доступ заблокирован'
+        ELSE 'Проверить вручную'
+    END AS uroven_dostupa,
+    IF(e.status_sotrudnika = 'активен', e.email, NULL) AS email_dlya_uvedomleniy
+FROM employees e
+ORDER BY e.fio;
+
+--2.7. создание одного представления на наиболее популярный запрос (CREATE VIEW) и временное представление – оператор WITH
+CREATE OR REPLACE VIEW v_zayavki_polnye AS
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    r.opisanie_zayavki,
+    rt.nazvanie_tipa_zayavki AS tip,
+    p.nazvanie_prioriteta    AS prioritet,
+    s.nazvanie_statusa       AS status,
+    e.fio                    AS initsiator,
+    d.nazvanie_podrazdeleniya AS otdel_initsiatora,
+    r.data_sozdaniya,
+    r.planovyy_srok,
+    r.fakticheskiy_srok,
+    CASE
+        WHEN r.fakticheskiy_srok IS NULL AND r.planovyy_srok < CURRENT_DATE THEN 'ПРОСРОЧЕНА'
+        WHEN r.fakticheskiy_srok IS NULL THEN 'Открыта'
+        WHEN r.fakticheskiy_srok <= r.planovyy_srok THEN 'Вовремя'
+        ELSE 'С опозданием'
+    END AS ocenka_sroka
+FROM requests r
+INNER JOIN request_types rt ON r.kod_tipa_zayavki = rt.kod_tipa_zayavki
+INNER JOIN priorities p     ON r.kod_prioriteta = p.kod_prioriteta
+INNER JOIN statuses s       ON r.kod_statusa = s.kod_statusa
+INNER JOIN employees e      ON r.kod_initsiatora = e.kod_sotrudnika
+INNER JOIN departments d    ON e.kod_podrazdeleniya = d.kod_podrazdeleniya;
+
+SELECT * FROM v_zayavki_polnye
+WHERE prioritet IN ('Высокий', 'Критический')
+ORDER BY data_sozdaniya DESC;
+
+WITH zagruzka AS (
+    SELECT
+        e.kod_sotrudnika,
+        e.fio,
+        COUNT(t.kod_zadachi) AS vsego_zadach,
+        SUM(CASE WHEN t.kod_statusa = 6 THEN 1 ELSE 0 END) AS vypolneno,
+        SUM(CASE WHEN t.kod_statusa <> 6 THEN 1 ELSE 0 END) AS otkryto
+    FROM employees e
+    INNER JOIN tasks t ON e.kod_sotrudnika = t.kod_ispolnitelya
+    GROUP BY e.kod_sotrudnika, e.fio
+)
+SELECT
+    fio,
+    vsego_zadach,
+    vypolneno,
+    otkryto,
+    CASE
+        WHEN otkryto = 0 THEN 'Свободен'
+        WHEN otkryto = 1 THEN 'Нормальная загрузка'
+        ELSE 'Перегружен'
+    END AS ocenka_zagruzki
+FROM zagruzka
+WHERE vsego_zadach >= 1
+ORDER BY otkryto DESC, vsego_zadach DESC;
+
+WITH bez_soglasovaniya AS (
+    SELECT r.kod_zayavki, r.tema_zayavki, r.data_sozdaniya
+    FROM requests r
+    WHERE r.kod_zayavki NOT IN (SELECT a.kod_zayavki FROM approvals a)
+)
+SELECT * FROM bez_soglasovaniya
+ORDER BY data_sozdaniya;
+
+--2.8. анализ и оптимизация запросов средствами EXPLAIN и созданием индексов (CREATE INDEX)
+EXPLAIN
+SELECT
+    r.tema_zayavki,
+    e.fio,
+    s.nazvanie_statusa
+FROM requests r
+INNER JOIN employees e ON r.kod_initsiatora = e.kod_sotrudnika
+INNER JOIN statuses s  ON r.kod_statusa = s.kod_statusa
+WHERE r.data_sozdaniya >= '2026-09-01'
+  AND r.kod_prioriteta >= 3
+ORDER BY r.data_sozdaniya DESC;
+
+CREATE INDEX idx_req_data_sozdaniya ON requests (data_sozdaniya);
+CREATE INDEX idx_req_prioritet      ON requests (kod_prioriteta);
+CREATE INDEX idx_req_initsiator     ON requests (kod_initsiatora);
+CREATE INDEX idx_task_ispolnitel    ON tasks (kod_ispolnitelya);
+CREATE INDEX idx_task_data          ON tasks (data_sozdaniya);
+CREATE INDEX idx_apr_data           ON approvals (data_resheniya);
+CREATE INDEX idx_emp_status         ON employees (status_sotrudnika);
+
+EXPLAIN
+SELECT
+    r.tema_zayavki,
+    e.fio,
+    s.nazvanie_statusa
+FROM requests r
+INNER JOIN employees e ON r.kod_initsiatora = e.kod_sotrudnika
+INNER JOIN statuses s  ON r.kod_statusa = s.kod_statusa
+WHERE r.data_sozdaniya >= '2026-09-01'
+  AND r.kod_prioriteta >= 3
+ORDER BY r.data_sozdaniya DESC;
+
+--2.9. механизм транзакций (START TRANSACTION)
+START TRANSACTION;
+
+INSERT INTO approvals (
+    kod_soglasovaniya,
+    kod_zayavki,
+    kod_soglasuyushchego,
+    rezultat_soglasovaniya,
+    kommentariy,
+    data_resheniya
+) VALUES (
+    8,
+    5,
+    10003,
+    'Согласовано',
+    'Ремонт одобрен, привлечь сисадмина',
+    CURRENT_DATE
+);
+
+UPDATE requests
+SET kod_statusa = 4
+WHERE kod_zayavki = 5;
+
+INSERT INTO tasks (
+    kod_zadachi,
+    naimenovanie_zadachi,
+    opisanie_zadachi,
+    kod_ispolnitelya,
+    kod_postanovshchika,
+    kod_statusa,
+    data_sozdaniya,
+    planovyy_srok,
+    fakticheskiy_srok,
+    kod_svyazannoy_zayavki
+) VALUES (
+    7,
+    'Выполнить ремонт принтера',
+    'Заменить картридж / починить принтер в бухгалтерии',
+    10007,      -- Николаев
+    10003,      -- Сидоров
+    1,          -- Новая
+    CURRENT_DATE,
+    DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY),
+    NULL,
+    5
+);
+
+COMMIT;
+
+--2.10. PREPARE / EXECUTE / DEALLOCATE
+SET @sql_text = '
+SELECT
+    r.kod_zayavki,
+    r.tema_zayavki,
+    p.nazvanie_prioriteta,
+    s.nazvanie_statusa,
+    e.fio AS initsiator,
+    r.data_sozdaniya
+FROM requests r
+INNER JOIN priorities p ON r.kod_prioriteta = p.kod_prioriteta
+INNER JOIN statuses s   ON r.kod_statusa = s.kod_statusa
+INNER JOIN employees e  ON r.kod_initsiatora = e.kod_sotrudnika
+WHERE r.kod_prioriteta = ?
+  AND r.data_sozdaniya >= ?
+ORDER BY r.data_sozdaniya DESC
+';
+
+PREPARE stmt_zayavki FROM @sql_text;
+
+SET @p_prioritet = 3;
+SET @p_data      = '2026-09-01';
+
+EXECUTE stmt_zayavki USING @p_prioritet, @p_data;
+
+SET @p_prioritet = 2;
+EXECUTE stmt_zayavki USING @p_prioritet, @p_data;
+
+DEALLOCATE PREPARE stmt_zayavki;
